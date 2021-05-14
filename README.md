@@ -18,7 +18,7 @@ Generate csv with list of shared files/folders on your google drive
     3. In the sidebar on the left, expand APIs & auth and select APIs.
     4. In the displayed list of available APIs, click the Drive API link and click Enable API.
 
-3. PyDrive
+3. 
 
 ##Reference:
 - https://developers.google.com/drive/api/v3/quickstart/python
