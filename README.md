@@ -1,5 +1,5 @@
 # shared-google-drive
-List/batch edit the shared status files/folders on your google drive
+List/batch edit the shared status of google drive files/folders using csv
 
 
 ## TODO:
