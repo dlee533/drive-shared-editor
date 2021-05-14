@@ -53,16 +53,16 @@ def get_parent(drive, child_item):
     parent_id = child_item['parents'][0]['id']
     if parent_id in folder_dict.keys():
         return folder_dict.get(parent_id, None)
-    return drive.CreateFile({'id': parent_id})
-
+    parent = drive.CreateFile({'id': parent_id})
+    parent['title']
+    folder_dict[parent_id] = parent
+    return parent
 
 
 def get_path(drive, item):
     if item['parents'][0]['isRoot']:
         return "ROOT/" + item['title']
     parent_item = get_parent(drive, item)
-    if parent_item is None:
-        print("None")
     return get_path(drive, parent_item) + "/" + item['title']
 
 
@@ -85,16 +85,26 @@ def main(request=None):
         gauth.LocalWebserverAuth()
         gauth.SaveCredentialsFile(cred_path)
     drive = GoogleDrive(gauth)
-
-    items = drive.ListFile({'q': "visibility!='limited' and trashed=false"}).GetList()
+    email = drive.GetAbout()['user']['emailAddress']
+    items = drive.ListFile({'q': f"'{email}' in owners and trashed=false"}).GetList()
+    items = [item for item in items if item['shared']]
+    print("length =", len(items))
     for item in items:
         folder_dict[item['id']] = item
-    items = [(get_path(drive, item), 'folder' if item['mimeType'] == 'application/vnd.google-apps.folder' else 'file') for item in items]
-    generate_csv(output_path, items)
+    result = []
+    for i in range(len(items)):
+        item = items[i]
+        print(i+1)
+        try:
+            result.append((get_path(drive, item), 'folder' if item['mimeType'] == 'application/vnd.google-apps.folder' else 'file'))
+        except Exception:
+            pass
+    print(len(result))
+    generate_csv(output_path, result)
 
 
 if __name__ == "__main__":
-    # command line
+    # # command line
     # request = setup_request_commandline()
     # main(request)
 

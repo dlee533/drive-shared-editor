@@ -2,7 +2,7 @@
 Generate csv with list of shared files/folders on your google drive
 
 ## TODO:
-* write README.md
+* readme
 
 
 ##Steps:
