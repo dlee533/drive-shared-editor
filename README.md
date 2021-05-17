@@ -19,7 +19,10 @@ List/bulk edit the shared status of google drive files/folders using csv
     3. In the sidebar on the left, expand APIs & auth and select APIs.
     4. In the displayed list of available APIs, click the Drive API link and click Enable API.
 
-3. 
+3. Install PyDrive
+ ```cmd
+  pip install PyDrive
+ ```
 
 ##Reference:
 - https://developers.google.com/drive/api/v3/quickstart/python
