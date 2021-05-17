@@ -2,6 +2,7 @@ import argparse
 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
+import pandas as pd
 
 
 class Request:
@@ -13,13 +14,11 @@ class Request:
         Initialize Request details.
         """
         self.mode = None
-        self.cred_path = None
-        self.output = None
+        self.csv_path = None
 
     def __str__(self):
-        return f"Mode: {self.mode}\n" \
-               f"cred_path: {self.cred_path}\n" \
-               f"output: {self.output}"
+        return f"mode: {self.mode}\n" \
+               f"csv_path: {self.csv_path}"
 
 
 def setup_request_commandline():
@@ -29,84 +28,157 @@ def setup_request_commandline():
     :return: a Request with provided arguments
     """
     parser = argparse.ArgumentParser()
-    # parser.add_argument("mode",
-    #                     choices=("list", "", ""))
-    parser.add_argument("cred_path")
-    parser.add_argument("output")
+    parser.add_argument("mode",
+                        choices=("list", "edit"))
+    parser.add_argument("csv_path")
 
     try:
         args = parser.parse_args()
         request = Request()
-        # request.mode = args.mode
-        request.cred_path = args.cred_path
-        request.output = args.output
+        request.mode = args.mode
+        request.csv_path = args.csv_path
         return request
     except Exception as e:
         print(f"Error! Could not read arguments.\n{e}")
         quit()
 
 
-folder_dict = {}
+# static facade class
+class ShareEditor:
 
+    _folder_dict = {}
 
-def get_parent(drive, child_item):
-    parent_id = child_item['parents'][0]['id']
-    if parent_id in folder_dict.keys():
-        return folder_dict.get(parent_id, None)
-    parent = drive.CreateFile({'id': parent_id})
-    parent['title']
-    folder_dict[parent_id] = parent
-    return parent
+    @staticmethod
+    def _get_parent(drive, child_item):
+        parent_id = child_item['parents'][0]['id']
+        if parent_id in ShareEditor._folder_dict.keys():
+            return ShareEditor._folder_dict.get(parent_id, None)
+        parent = drive.CreateFile({'id': parent_id})
+        ShareEditor._folder_dict[parent_id] = parent
+        return parent
 
+    @staticmethod
+    def _get_path(drive, item):
+        if item['parents'][0]['isRoot']:
+            return "ROOT/" + item['title']
+        parent_item = ShareEditor._get_parent(drive, item)
+        return ShareEditor._get_path(drive, parent_item) + "/" + item['title']
 
-def get_path(drive, item):
-    if item['parents'][0]['isRoot']:
-        return "ROOT/" + item['title']
-    parent_item = get_parent(drive, item)
-    return get_path(drive, parent_item) + "/" + item['title']
+    @staticmethod
+    def _write_csv(output_path, dataset):
+        df = pd.DataFrame(dataset)
+        df.to_csv(output_path, index=False)
+        # print(df)
 
+    @staticmethod
+    def _read_csv(input_path):
+        df = pd.read_csv(input_path, index_col=0)
+        return df
 
-def generate_csv(output_path, items):
-    with open(output_path, 'w') as f:
-        f.write('path,type\n')
+    @staticmethod
+    def _is_in_my_drive(drive, item):
+        try:
+            ShareEditor._get_path(drive, item)
+        except IndexError:
+            return False
+        return True
+
+    @staticmethod
+    def _get_permission(items, email):
+        anyone_arr = []
+        reader_arr = []
+        commenter_arr = []
+        editor_arr = []
+
         for item in items:
-            f.write(f'"{item[0]}","{item[1]}"\n')
+            anyone = True
+            reader = []
+            commenter = []
+            editor = []
+            item.FetchMetadata(fields='permissions')
+
+            if item['permissions'][0]['id'] != 'anyoneWithLink':
+                anyone = False
+                if item['title'] == "myStyle.css":
+                    print(item['permissions'])
+
+                for user in item['permissions']:
+                    # account owner
+                    if user['emailAddress'] == email:
+                        continue
+
+                    # editor
+                    if user['role'] == "writer":
+                        editor.append(user['emailAddress'])
+                        continue
+
+                    if user.get('additionalRoles', False):
+                        commenter.append(user['emailAddress'])
+                    else:
+                        reader.append(user['emailAddress'])
+
+            anyone_arr.append(anyone)
+            reader_arr.append('-' if len(reader)==0 else ",".join(reader))
+            commenter_arr.append('-' if len(commenter)==0 else ",".join(commenter))
+            editor_arr.append('-' if len(editor)==0 else ",".join(editor))
+
+        permission = {
+            'anyoneWithLink': anyone_arr,
+            'reader': reader_arr,  # reader
+            'commenter': commenter_arr,  # reader + commenter
+            'editor': editor_arr  # writer
+        }
+        return permission
+
+    @staticmethod
+    def _get_shared(drive):
+        email = drive.GetAbout()['user']['emailAddress']
+        items = drive.ListFile({'q': f"'{email}' in owners and trashed=false and 'me' in owners"}).GetList()
+        items = [item for item in items if item['shared']]
+        for item in items:
+            ShareEditor._folder_dict[item['id']] = item
+            item.FetchMetadata(fields='permissions')
+        items = [item for item in items if ShareEditor._is_in_my_drive(drive, item)]
+        dataset = {
+            'id': [item['id'] for item in items],
+            'path': [ShareEditor._get_path(drive, item) for item in items],
+            'type': ['folder' if item['mimeType'] == 'application/vnd.google-apps.folder' else 'file' for item in items]
+        }
+        dataset.update(ShareEditor._get_permission(items, email))
+        return dataset
+
+    @staticmethod
+    def list_shared(drive, output_path):
+        dataset = ShareEditor._get_shared(drive)
+        ShareEditor._write_csv(output_path, dataset)
+
+
+    @staticmethod
+    def edit_shared(drive, input_path):
+        df_final = ShareEditor._read_csv(input_path)
+        df_current = ShareEditor._get_shared(drive)
+
 
 
 def main(request=None):
-    cred_path = "token.json" if request is None else request.cred_path
-    output_path = "output.csv" if request is None else request.output
+    token = "token.json"
     gauth = GoogleAuth()
     try:
-        gauth.LoadCredentialsFile(cred_path)
-        if gauth.access_token_expired is True:
-            raise Exception("token expired")
+        gauth.LoadCredentialsFile(token)
     except Exception:
         gauth.LocalWebserverAuth()
-        gauth.SaveCredentialsFile(cred_path)
+        gauth.SaveCredentialsFile(token)
     drive = GoogleDrive(gauth)
-    email = drive.GetAbout()['user']['emailAddress']
-    items = drive.ListFile({'q': f"'{email}' in owners and trashed=false"}).GetList()
-    items = [item for item in items if item['shared']]
-    print("length =", len(items))
-    for item in items:
-        folder_dict[item['id']] = item
-    result = []
-    for i in range(len(items)):
-        item = items[i]
-        print(i+1)
-        try:
-            result.append((get_path(drive, item), 'folder' if item['mimeType'] == 'application/vnd.google-apps.folder' else 'file'))
-        except Exception:
-            pass
-    print(len(result))
-    generate_csv(output_path, result)
+
+    action = {
+        "list": ShareEditor.list_shared,
+        "edit": ShareEditor.edit_shared
+    }
+
+    action[request.mode](drive, request.csv_path)
 
 
 if __name__ == "__main__":
-    # # command line
-    # request = setup_request_commandline()
-    # main(request)
+    request = setup_request_commandline()
+    main(request)
 
-    # ide
-    main()

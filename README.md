@@ -1,8 +1,9 @@
 # shared-google-drive
-Generate csv with list of shared files/folders on your google drive
+List/bulk edit the shared status of google drive files/folders using csv
 
 ## TODO:
 * readme
+* bulk editing: unshare files that are shared
 
 
 ##Steps:
