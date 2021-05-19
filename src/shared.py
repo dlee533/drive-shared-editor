@@ -34,10 +34,10 @@ def setup_request_commandline():
 
     try:
         args = parser.parse_args()
-        request = Request()
-        request.mode = args.mode
-        request.csv_path = args.csv_path
-        return request
+        _request = Request()
+        _request.mode = args.mode
+        _request.csv_path = args.csv_path
+        return _request
     except Exception as e:
         print(f"Error! Could not read arguments.\n{e}")
         quit()
@@ -68,11 +68,10 @@ class ShareEditor:
     def _write_csv(output_path, dataset):
         df = pd.DataFrame(dataset)
         df.to_csv(output_path, index=False)
-        # print(df)
 
     @staticmethod
     def _read_csv(input_path):
-        df = pd.read_csv(input_path, index_col=0)
+        df = pd.read_csv(input_path)
         return df
 
     @staticmethod
@@ -84,50 +83,33 @@ class ShareEditor:
         return True
 
     @staticmethod
+    def _get_role(user):
+        if user['role'] == 'writer':
+            return 'editor'
+        elif user.get('additionalRoles', False):
+            return 'commenter'
+        elif user['role'] == 'reader':
+            return 'reader'
+        return ''
+
+    @staticmethod
     def _get_permission(items, email):
-        anyone_arr = []
-        reader_arr = []
-        commenter_arr = []
-        editor_arr = []
+        permission = {key: ['' for _ in items] for key in ['anyoneWithLink', 'reader', 'commenter', 'editor']}
 
-        for item in items:
-            anyone = True
-            reader = []
-            commenter = []
-            editor = []
+        for i, item in enumerate(items):
             item.FetchMetadata(fields='permissions')
+            for user in item['permissions']:
+                permission['anyoneWithLink'][i] = ShareEditor._get_role(user)
+                if user['id'] == 'anyoneWithLink':
+                    break
+                elif user.get('emailAddress', None) == email:
+                    continue
+                permission[ShareEditor._get_role(user)][i] += ',' + user['emailAddress']
 
-            if item['permissions'][0]['id'] != 'anyoneWithLink':
-                anyone = False
-                if item['title'] == "myStyle.css":
-                    print(item['permissions'])
+        for key in ['reader', 'commenter', 'editor']:
+            for i in range(len(items)):
+                permission[key][i] = permission[key][i].strip(',')
 
-                for user in item['permissions']:
-                    # account owner
-                    if user['emailAddress'] == email:
-                        continue
-
-                    # editor
-                    if user['role'] == "writer":
-                        editor.append(user['emailAddress'])
-                        continue
-
-                    if user.get('additionalRoles', False):
-                        commenter.append(user['emailAddress'])
-                    else:
-                        reader.append(user['emailAddress'])
-
-            anyone_arr.append(anyone)
-            reader_arr.append('-' if len(reader)==0 else ",".join(reader))
-            commenter_arr.append('-' if len(commenter)==0 else ",".join(commenter))
-            editor_arr.append('-' if len(editor)==0 else ",".join(editor))
-
-        permission = {
-            'anyoneWithLink': anyone_arr,
-            'reader': reader_arr,  # reader
-            'commenter': commenter_arr,  # reader + commenter
-            'editor': editor_arr  # writer
-        }
         return permission
 
     @staticmethod
@@ -135,37 +117,56 @@ class ShareEditor:
         email = drive.GetAbout()['user']['emailAddress']
         items = drive.ListFile({'q': f"'{email}' in owners and trashed=false and 'me' in owners"}).GetList()
         items = [item for item in items if item['shared']]
+
         for item in items:
             ShareEditor._folder_dict[item['id']] = item
             item.FetchMetadata(fields='permissions')
+
         items = [item for item in items if ShareEditor._is_in_my_drive(drive, item)]
         dataset = {
             'id': [item['id'] for item in items],
             'path': [ShareEditor._get_path(drive, item) for item in items],
             'type': ['folder' if item['mimeType'] == 'application/vnd.google-apps.folder' else 'file' for item in items]
         }
+
         dataset.update(ShareEditor._get_permission(items, email))
         return dataset
+
+    @staticmethod
+    def _insert_permission():
+        pass
+
+    @staticmethod
+    def _remove_permission():
+        pass
 
     @staticmethod
     def list_shared(drive, output_path):
         dataset = ShareEditor._get_shared(drive)
         ShareEditor._write_csv(output_path, dataset)
 
-
     @staticmethod
     def edit_shared(drive, input_path):
-        df_final = ShareEditor._read_csv(input_path)
-        df_current = ShareEditor._get_shared(drive)
+        df = pd.DataFrame(ShareEditor._read_csv(input_path))
+
+        id_set = set(df['id'])
+
+        for _id in id_set:
+            row = df.loc[df['id'] == _id]
+            if len(row) > 1:
+                print(f"skipping {row['name']}: more than one entry exists")
+                continue
+            item = drive.CreateFile({'id': _id})
+            for permission in item.FetchMetadata(fields='permissions'):
+                pass
 
 
-
-def main(request=None):
+def main(_request=None):
     token = "token.json"
     gauth = GoogleAuth()
     try:
         gauth.LoadCredentialsFile(token)
-    except Exception:
+    except Exception:  # TODO: change to specific exception
         gauth.LocalWebserverAuth()
         gauth.SaveCredentialsFile(token)
     drive = GoogleDrive(gauth)
@@ -175,10 +176,10 @@ def main(request=None):
         "edit": ShareEditor.edit_shared
     }
 
-    action[request.mode](drive, request.csv_path)
+    action[request.mode](drive, _request.csv_path)
+    print("finished execution")
 
 
 if __name__ == "__main__":
     request = setup_request_commandline()
     main(request)
-

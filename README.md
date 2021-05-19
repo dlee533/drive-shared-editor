@@ -4,7 +4,7 @@ List/bulk edit the shared status of google drive files/folders using csv
 ## TODO:
 * readme
 * bulk editing: unshare files that are shared
-
+* logging
 
 ##Steps:
 
