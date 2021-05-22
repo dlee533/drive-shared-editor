@@ -6,6 +6,7 @@ List/bulk edit the shared status of google drive files/folders using csv
 * bulk editing: unshare files that are shared
 * logging
 * error handling for invalid input csv (for editing shared status)
+* https://developers.google.com/drive/api/v3/manage-sharing: HOW SHARING PROPAGATION WORKS
 
 ##Steps:
 

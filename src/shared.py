@@ -45,7 +45,7 @@ def setup_request_commandline():
     try:
         args = parser.parse_args()
 
-        if args.mode == "edit" and (args.input is None or  not os.path.isfile(args.input)):
+        if args.mode == "edit" and (args.input is None or not os.path.isfile(args.input)):
             parser.error("edit requires path to csv as input")
         _request = Request()
         _request.mode = args.mode
@@ -72,7 +72,7 @@ class ShareManager:
         items = self._drive.ListFile({'q': f"'{email}' in owners and trashed=false and 'me' in owners"}).GetList()
         items = [item for item in items if self._is_shared_by_me(item)]
 
-        headers = ['id', 'path', 'type', 'reader', 'commenter', 'editor']
+        headers = ['id', 'path', 'type', 'READER', 'COMMENTER', 'EDITOR']
         dataset = {header: [] for header in headers}
 
         for item in items:
@@ -80,9 +80,9 @@ class ShareManager:
             dataset['path'].append(self._get_path(item))
             dataset['type'].append('folder' if item['mimeType'] == 'application/vnd.google-apps.folder' else 'file')
             permission = self._get_permission(item)
-            dataset['reader'].append(permission[0])
-            dataset['commenter'].append(permission[1])
-            dataset['editor'].append(permission[2])
+            dataset['READER'].append(','.join(permission[0]))
+            dataset['COMMENTER'].append(','.join(permission[1]))
+            dataset['EDITOR'].append(','.join(permission[2]))
 
         df = pd.DataFrame(dataset)
         if output_path is None:
@@ -92,21 +92,58 @@ class ShareManager:
     def edit(self, input_path):
         if self._drive is None:
             self._get_drive()
-        # df = pd.read_csv(input_path)
-        # email = drive.GetAbout()['user']['emailAddress']
-        #
-        # df = pd.DataFrame(ShareEditor._read_csv(input_path))
-        #
-        # id_set = set(df['id'])
-        #
-        # for _id in id_set:
-        #     row = df.loc[df['id'] == _id]
-        #     if len(row) > 1:
-        #         print(f"skipping {row['name']}: more than one entry exists")
-        #         continue
-        #     item = drive.CreateFile({'id': _id})
-        #     for permission in item.FetchMetadata(fields='permissions'):
-        #         pass
+
+        df = pd.read_csv(input_path)
+        ids = set(df['id'])
+
+        for _id in ids:
+            row = df.loc[df['id'] == _id]
+            if len(row) != 1:
+                print(f"skipping {row['name']}: more than one entry exists")
+                continue
+
+            item = self._drive.CreateFile({'id': _id})
+            final_permission = {}
+            for role in list(Roles):
+                users = row[role.name].values[0]
+                users = [] if type(users) is not str else users.split(',')
+                for user in users:
+                    final_permission[user] = role
+
+            current_permission = self._get_permission(item)
+            print(current_permission)
+            for i, role in enumerate([Roles.READER, Roles.COMMENTER, Roles.EDITOR]):
+                for user in current_permission[i]:
+                    if final_permission.get(user, None) is None:
+                        self._remove_permission(_id, user)
+                        print(f'remove permission from {role}: {user}')
+                    elif final_permission[user].value < role.value:
+                        self._remove_permission(_id, user)
+                        self._insert_permission(_id, user, final_permission[user])
+                        print(f'change permission from {role} to {final_permission[user]}: {user}')
+                    elif final_permission[user].value > role.value:
+                        print(f'cannot change permission from {role} to {final_permission.get(user, None)}: {user}')
+
+    def _remove_permission(self, _id, user):
+        file = self._drive.CreateFile({"id": _id})
+        permissions = file.GetPermissions()
+        for permission in permissions:
+            print(permission)
+        permission = list(filter(lambda x: True if (x.get('emailAddress', '') == user or 'anyone' in x.get('id', '')) else False, permissions))[0]
+        file.DeletePermission(permission['id'])
+        logging.log(10, f'unshared {file["id"]} from {user}')
+
+    def _insert_permission(self, _id, user, role):
+        file = self._drive.CreateFile({"id": _id})
+        permission = {
+            'type': 'anyone' if user == 'anyoneWithLink' else 'user',
+            'value': 'anyone' if user == 'anyoneWithLink' else user,
+            'role': 'writer' if role == Roles.EDITOR else 'reader'
+        }
+        if role == Roles.COMMENTER:
+            permission['additionalRoles'] = ['commenter']
+
+        file.InsertPermission(permission)
 
     def _is_shared_by_me(self, item):
         if not item['shared']:
@@ -168,7 +205,7 @@ class ShareManager:
                 continue
             permission[self._get_role(user)].append(user.get('emailAddress', 'anyoneWithLink'))
 
-        return ','.join(permission[Roles.READER]), ','.join(permission[Roles.COMMENTER]), ','.join(permission[Roles.EDITOR])
+        return permission[Roles.READER], permission[Roles.COMMENTER], permission[Roles.EDITOR]
 
     @staticmethod
     def _get_role(user):
@@ -188,6 +225,13 @@ def test_list():
     print("finished execution")
 
 
+def test_edit():
+    manager = ShareManager()
+    manager.edit("shared_05222021_112506.csv")
+
+    print("finished execution")
+
+
 def main(_request=None):
     manager = ShareManager()
 
@@ -200,7 +244,9 @@ def main(_request=None):
 
 
 if __name__ == "__main__":
-    request = setup_request_commandline()
-    main(request)
+    # request = setup_request_commandline()
+    # main(request)
 
-    # test_list()
+    test_list()
+
+    # test_edit()
