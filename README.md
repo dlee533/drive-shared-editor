@@ -1,4 +1,4 @@
-# shared-google-drive
+# drive-shared-editor
 List/bulk edit the shared status of google drive files/folders using csv
 
 ##Steps:
