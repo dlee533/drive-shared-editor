@@ -116,19 +116,17 @@ class ShareManager:
                 for user in current_permission[i]:
                     if final_permission.get(user, None) is None:
                         self._remove_permission(_id, user)
-                        print(f'remove permission from {role}: {user}')
+                        logging.log(10, f'remove permission from {role}: {user}')
                     elif final_permission[user].value < role.value:
                         self._remove_permission(_id, user)
                         self._insert_permission(_id, user, final_permission[user])
-                        print(f'change permission from {role} to {final_permission[user]}: {user}')
+                        logging.log(10, f'change permission from {role} to {final_permission[user]}: {user}')
                     elif final_permission[user].value > role.value:
-                        print(f'cannot change permission from {role} to {final_permission.get(user, None)}: {user}')
+                        logging.log(10, f'cannot change permission from {role} to {final_permission.get(user, None)}: {user}')
 
     def _remove_permission(self, _id, user):
         file = self._drive.CreateFile({"id": _id})
         permissions = file.GetPermissions()
-        for permission in permissions:
-            print(permission)
         permission = list(filter(lambda x: True if (x.get('emailAddress', '') == user or 'anyone' in x.get('id', '')) else False, permissions))[0]
         file.DeletePermission(permission['id'])
         logging.log(10, f'unshared {file["id"]} from {user}')

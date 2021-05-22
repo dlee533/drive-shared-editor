@@ -1,30 +1,29 @@
 # shared-google-drive
 List/bulk edit the shared status of google drive files/folders using csv
 
-## TODO:
-* readme
-* bulk editing: unshare files that are shared
-* logging
-* error handling for invalid input csv (for editing shared status)
-* https://developers.google.com/drive/api/v3/manage-sharing: HOW SHARING PROPAGATION WORKS
-
 ##Steps:
 
-1. Install the Google client library
+1. Enable the [Google Drive API](https://developers.google.com/drive/api/v3/enable-drive-api)
+
+2. [Authenticate](https://developers.google.com/drive/api/v3/about-auth) your users and place the token in the src directory
+
+3. Install PyDrive and Pandas using pip command
+
+4. Run the program (src/shared.py) using command line interface
+
 ```cmd
-  pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+# to list the shared files in My Drive
+cd path/to/src
+python shared.py list 
+python shared.py list output.csv
+
+# to edit the shared files in My Drive
+# first edit the csv from list above, change only the reader, commenter, and editor columns
+python shared.py edit to_be_edited.csv
 ```
 
-2. Enable the Google Drive API
-    1. Go to the [Google API Console](https://console.cloud.google.com/apis/dashboard)
-    2. Create/select a project
-    3. In the sidebar on the left, expand APIs & auth and select APIs.
-    4. In the displayed list of available APIs, click the Drive API link and click Enable API.
-
-3. Install PyDrive
- ```cmd
-  pip install PyDrive
- ```
+##Note
+- [How the Google Drive's sharing propagation works](https://developers.google.com/drive/api/v3/manage-sharing: HOW SHARING PROPAGATION WORKS)
 
 ##Reference:
 - https://developers.google.com/drive/api/v3/quickstart/python
@@ -35,3 +34,4 @@ List/bulk edit the shared status of google drive files/folders using csv
 - https://learndataanalysis.org/google-drive-api-in-python-getting-started-lesson-1/
 - https://googleapis.github.io/google-api-python-client/docs/dyn/drive_v3.html
 - https://github.com/googleworkspace/PyDrive
+- https://developers.google.com/drive/api/v3/manage-sharing: HOW SHARING PROPAGATION WORKS
