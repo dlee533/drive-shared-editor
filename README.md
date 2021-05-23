@@ -12,13 +12,13 @@ List/bulk edit the shared status of google drive files/folders using csv
 4. Run the program (src/shared.py) using command line interface
 
 ```cmd
-// to list the shared files in My Drive
+: to list the shared files in My Drive
 cd path/to/src
 python shared.py list 
 python shared.py list output.csv
 
-// to edit the shared files in My Drive
-// first edit the csv from list above, change only the reader, commenter, and editor columns
+: to edit the shared files in My Drive
+: first edit the csv from list above, change only the reader, commenter, and editor columns
 python shared.py edit to_be_edited.csv
 ```
 
