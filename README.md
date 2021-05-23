@@ -1,7 +1,7 @@
 # drive-shared-editor
 List/bulk edit the shared status of google drive files/folders using csv
 
-##Steps:
+## Steps:
 
 1. Enable the [Google Drive API](https://developers.google.com/drive/api/v3/enable-drive-api)
 
@@ -22,10 +22,10 @@ python shared.py list output.csv
 python shared.py edit to_be_edited.csv
 ```
 
-##Note
-- [How the Google Drive's sharing propagation works](https://developers.google.com/drive/api/v3/manage-sharing: HOW SHARING PROPAGATION WORKS)
+## Note
+- [Google Drive's sharing propagation](https://developers.google.com/drive/api/v3/manage-sharing)
 
-##Reference:
+## Reference:
 - https://developers.google.com/drive/api/v3/quickstart/python
 - https://developers.google.com/drive/api/v3/enable-drive-api
 - https://developers.google.com/workspace/guides/create-credentials
@@ -34,4 +34,4 @@ python shared.py edit to_be_edited.csv
 - https://learndataanalysis.org/google-drive-api-in-python-getting-started-lesson-1/
 - https://googleapis.github.io/google-api-python-client/docs/dyn/drive_v3.html
 - https://github.com/googleworkspace/PyDrive
-- https://developers.google.com/drive/api/v3/manage-sharing: HOW SHARING PROPAGATION WORKS
+- https://developers.google.com/drive/api/v3/manage-sharing
